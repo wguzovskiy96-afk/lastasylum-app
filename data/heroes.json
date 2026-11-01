@@ -1,0 +1,18 @@
+[
+  {"id": "marlena", "name": "Марлена", "cls": "dmg", "troop": "red", "ornament": "M6 34 L20 22 L34 34"},
+  {"id": "daskal", "name": "Даскал", "cls": "tank", "troop": "red", "ornament": "M20 2 V46"},
+  {"id": "zoya", "name": "Зоя", "cls": "dmg", "troop": "red", "ornament": "M2 20 H38"},
+  {"id": "artur", "name": "Артур", "cls": "tank", "troop": "red", "ornament": "M2 4 L38 40"},
+  {"id": "harper", "name": "Харпер", "cls": "sup", "troop": "red", "ornament": "M38 4 L2 40"},
+  {"id": "cynthia", "name": "Синтия", "cls": "dmg", "troop": "blue", "ornament": "M2 6 L38 42 M38 6 L2 42"},
+  {"id": "louis", "name": "Луи", "cls": "tank", "troop": "blue", "ornament": "M20 2 V46 M2 20 H38"},
+  {"id": "shadow", "name": "Шэдоу", "cls": "tank", "troop": "blue", "ornament": "M4 28 L20 16 L36 28 M4 38 L20 26 L36 38"},
+  {"id": "red_lady", "name": "Красная Леди", "cls": "dmg", "troop": "blue", "ornament": "M2 13 H38 M2 29 H38"},
+  {"id": "claire", "name": "Клэр", "cls": "dmg", "troop": "red", "ornament": "M8 2 L20 26 L32 2"},
+  {"id": "bell", "name": "Белл", "cls": "sup", "troop": "blue", "ornament": "M2 8 L20 22 L38 8"},
+  {"id": "annie", "name": "Анни", "cls": "dmg", "troop": "green", "ornament": "M13 2 V46 M27 2 V46"},
+  {"id": "joker", "name": "Джокер", "cls": "dmg", "troop": "green", "ornament": "M2 30 Q20 12 38 30"},
+  {"id": "ulfrid", "name": "Ульфрид", "cls": "tank", "troop": "green", "ornament": "M2 16 L11 25 L20 16 L29 25 L38 16"},
+  {"id": "billy", "name": "Билли", "cls": "tank", "troop": "green", "ornament": "M2 34 H38 M2 10 L20 26 L38 10"},
+  {"id": "nicole", "name": "Николь", "cls": "sup", "troop": "green", "ornament": "M2 22 Q11 13 20 22 T38 22"}
+]
