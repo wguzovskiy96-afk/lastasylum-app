@@ -190,6 +190,104 @@
     render();
   }
 
+  // ---------- Удержание −/+ : уровень бежит сам и ускоряется ----------
+  let hold = null;
+  function stopHold() {
+    if (!hold) return;
+    clearTimeout(hold.timer);
+    hold = null;
+  }
+
+  // Шаг на delta от текущего значения; возвращает новый уровень или null, если упёрлись в 0 / потолок
+  function stepLevel(heroId, slot, delta) {
+    const it = item(heroId, slot);
+    const next = Math.max(0, Math.min(cap(it.stars), it.level + delta));
+    if (next === it.level) return null;
+    setItem(heroId, slot, next, it.stars);
+    return next;
+  }
+
+  function startHold(heroId, slot, delta) {
+    stopHold();
+    blurLevelInput();
+    if (stepLevel(heroId, slot, delta) === null) return;
+    haptic();
+    const started = Date.now();
+    const tick = () => {
+      if (!hold) return;
+      const lvl = stepLevel(heroId, slot, delta);
+      if (lvl === null) {
+        stopHold();
+        try { tg && tg.HapticFeedback.impactOccurred('medium'); } catch (e) { /* ignore */ }
+        return;
+      }
+      if (lvl % 5 === 0) haptic();
+      const t = Date.now() - started;
+      hold.timer = setTimeout(tick, t > 2000 ? 40 : t > 1000 ? 80 : 140);
+    };
+    hold = { timer: setTimeout(tick, 400) };
+  }
+
+  // Кнопка перерисовывается на каждом шаге, поэтому отпускание ловим на всём окне
+  ['pointerup', 'pointercancel', 'blur'].forEach((ev) => window.addEventListener(ev, stopHold));
+  document.addEventListener('visibilitychange', stopHold);
+
+  function holdBtn(text, label, heroId, slot, delta) {
+    return el('button', {
+      type: 'button', class: 'step-btn', text, 'aria-label': label,
+      onpointerdown: (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        startHold(heroId, slot, delta);
+      },
+      // Клик мышью/пальцем уже обработан в pointerdown; здесь — только Enter/Пробел с клавиатуры
+      onclick: (e) => { if (e.detail === 0) stepLevel(heroId, slot, delta); },
+      oncontextmenu: (e) => e.preventDefault(),
+    });
+  }
+
+  // ---------- Ввод уровня с клавиатуры ----------
+  // Пока печатаешь, значение сразу пишется в состояние, но экран не перерисовывается
+  // (иначе пропадёт фокус). Перерисовка — после ухода с поля и отпускания пальца,
+  // чтобы не «съесть» нажатие на звезду или другую кнопку.
+  let pointerIsDown = false;
+  let pendingRender = false;
+  window.addEventListener('pointerdown', () => { pointerIsDown = true; }, true);
+  ['pointerup', 'pointercancel'].forEach((ev) => window.addEventListener(ev, () => {
+    pointerIsDown = false;
+    if (pendingRender) { pendingRender = false; setTimeout(render, 50); }
+  }));
+
+  function blurLevelInput() {
+    const a = document.activeElement;
+    if (a && a.classList && a.classList.contains('level-input')) a.blur();
+  }
+
+  function levelInput(heroId, slot, it, c) {
+    return el('input', {
+      class: 'level-input', type: 'text', inputmode: 'numeric', pattern: '[0-9]*',
+      enterkeyhint: 'done', maxlength: 2, autocomplete: 'off', value: String(it.level),
+      'aria-label': `Уровень, от 0 до ${c}`,
+      // При нажатии поле очищается (старое значение остаётся подсказкой) — сразу печатаешь новое
+      onfocus: (e) => { e.target.placeholder = e.target.value; e.target.value = ''; },
+      oninput: (e) => {
+        const digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+        if (digits !== e.target.value) e.target.value = digits;
+        if (digits === '') return;
+        const cur = item(heroId, slot);
+        const level = Math.max(0, Math.min(cap(cur.stars), parseInt(digits, 10)));
+        state.equipment[heroId] = Object.assign({}, state.equipment[heroId], { [slot]: { level, stars: cur.stars } });
+        state.result = null;
+        saveSoon();
+      },
+      onkeydown: (e) => { if (e.key === 'Enter') e.target.blur(); },
+      onblur: () => {
+        if (pointerIsDown) pendingRender = true;
+        else setTimeout(render, 0);
+      },
+    });
+  }
+
   function filledCount() { return POS.filter((p) => state.squad[p]).length; }
   function nextEmpty(from) {
     const start = POS.indexOf(from);
@@ -304,24 +402,22 @@
       const stars = [1, 2, 3, 4, 5].map((n) => el('button', {
         type: 'button', class: 'star' + (n <= it.stars ? ' on' : '') + (n === 5 ? ' red' : ''),
         'aria-label': `${n} из 5 звёзд`, text: '★',
-        onclick: () => setItem(heroId, slot, it.level, it.stars === n ? n - 1 : n),
+        onclick: () => { const cur = item(heroId, slot); setItem(heroId, slot, cur.level, cur.stars === n ? n - 1 : n); },
       }));
       const chips = [...new Set([20, ROUTES.baseCap, c])].map((v) => el('button', {
         type: 'button', class: 'chip' + (v === it.level ? ' on' : ''),
         text: v === c && v !== 20 && v !== ROUTES.baseCap ? 'макс' : String(v),
         'aria-label': 'Уровень ' + v,
-        onclick: () => setItem(heroId, slot, v, it.stars),
+        onclick: () => setItem(heroId, slot, v, item(heroId, slot).stars),
       }));
       return el('div', { class: 'item' + (headroom ? ' headroom' : '') },
         el('div', { class: 'row' },
           el('div', { class: 'title' }, SLOT_NAMES[slot], headroom ? el('span', { class: 'badge', text: 'можно до ' + c }) : null),
           el('div', { class: 'stars', role: 'group', 'aria-label': `Звёзды: ${it.stars} из 5` }, stars)),
         el('div', { class: 'controls' },
-          el('button', { type: 'button', class: 'step-btn', text: '−', 'aria-label': 'Уменьшить уровень',
-            onclick: () => setItem(heroId, slot, it.level - 1, it.stars) }),
-          el('div', { class: 'level' }, el('b', { text: it.level }), el('span', { text: 'ур. / ' + c })),
-          el('button', { type: 'button', class: 'step-btn', text: '+', 'aria-label': 'Увеличить уровень',
-            onclick: () => setItem(heroId, slot, it.level + 1, it.stars) }),
+          holdBtn('−', 'Уменьшить уровень (удерживай для быстрой смены)', heroId, slot, -1),
+          el('div', { class: 'level' }, levelInput(heroId, slot, it, c), el('span', { text: 'ур. / ' + c })),
+          holdBtn('+', 'Увеличить уровень (удерживай для быстрой смены)', heroId, slot, 1),
           el('div', { class: 'chips' }, chips)));
     });
 
