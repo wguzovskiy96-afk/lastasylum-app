@@ -209,6 +209,7 @@
 
   function startHold(heroId, slot, delta) {
     stopHold();
+    blurLevelInput();
     if (stepLevel(heroId, slot, delta) === null) return;
     haptic();
     const started = Date.now();
@@ -242,6 +243,48 @@
       // Клик мышью/пальцем уже обработан в pointerdown; здесь — только Enter/Пробел с клавиатуры
       onclick: (e) => { if (e.detail === 0) stepLevel(heroId, slot, delta); },
       oncontextmenu: (e) => e.preventDefault(),
+    });
+  }
+
+  // ---------- Ввод уровня с клавиатуры ----------
+  // Пока печатаешь, значение сразу пишется в состояние, но экран не перерисовывается
+  // (иначе пропадёт фокус). Перерисовка — после ухода с поля и отпускания пальца,
+  // чтобы не «съесть» нажатие на звезду или другую кнопку.
+  let pointerIsDown = false;
+  let pendingRender = false;
+  window.addEventListener('pointerdown', () => { pointerIsDown = true; }, true);
+  ['pointerup', 'pointercancel'].forEach((ev) => window.addEventListener(ev, () => {
+    pointerIsDown = false;
+    if (pendingRender) { pendingRender = false; setTimeout(render, 50); }
+  }));
+
+  function blurLevelInput() {
+    const a = document.activeElement;
+    if (a && a.classList && a.classList.contains('level-input')) a.blur();
+  }
+
+  function levelInput(heroId, slot, it, c) {
+    return el('input', {
+      class: 'level-input', type: 'text', inputmode: 'numeric', pattern: '[0-9]*',
+      enterkeyhint: 'done', maxlength: 2, autocomplete: 'off', value: String(it.level),
+      'aria-label': `Уровень, от 0 до ${c}`,
+      // При нажатии поле очищается (старое значение остаётся подсказкой) — сразу печатаешь новое
+      onfocus: (e) => { e.target.placeholder = e.target.value; e.target.value = ''; },
+      oninput: (e) => {
+        const digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+        if (digits !== e.target.value) e.target.value = digits;
+        if (digits === '') return;
+        const cur = item(heroId, slot);
+        const level = Math.max(0, Math.min(cap(cur.stars), parseInt(digits, 10)));
+        state.equipment[heroId] = Object.assign({}, state.equipment[heroId], { [slot]: { level, stars: cur.stars } });
+        state.result = null;
+        saveSoon();
+      },
+      onkeydown: (e) => { if (e.key === 'Enter') e.target.blur(); },
+      onblur: () => {
+        if (pointerIsDown) pendingRender = true;
+        else setTimeout(render, 0);
+      },
     });
   }
 
@@ -359,13 +402,13 @@
       const stars = [1, 2, 3, 4, 5].map((n) => el('button', {
         type: 'button', class: 'star' + (n <= it.stars ? ' on' : '') + (n === 5 ? ' red' : ''),
         'aria-label': `${n} из 5 звёзд`, text: '★',
-        onclick: () => setItem(heroId, slot, it.level, it.stars === n ? n - 1 : n),
+        onclick: () => { const cur = item(heroId, slot); setItem(heroId, slot, cur.level, cur.stars === n ? n - 1 : n); },
       }));
       const chips = [...new Set([20, ROUTES.baseCap, c])].map((v) => el('button', {
         type: 'button', class: 'chip' + (v === it.level ? ' on' : ''),
         text: v === c && v !== 20 && v !== ROUTES.baseCap ? 'макс' : String(v),
         'aria-label': 'Уровень ' + v,
-        onclick: () => setItem(heroId, slot, v, it.stars),
+        onclick: () => setItem(heroId, slot, v, item(heroId, slot).stars),
       }));
       return el('div', { class: 'item' + (headroom ? ' headroom' : '') },
         el('div', { class: 'row' },
@@ -373,7 +416,7 @@
           el('div', { class: 'stars', role: 'group', 'aria-label': `Звёзды: ${it.stars} из 5` }, stars)),
         el('div', { class: 'controls' },
           holdBtn('−', 'Уменьшить уровень (удерживай для быстрой смены)', heroId, slot, -1),
-          el('div', { class: 'level' }, el('b', { text: it.level }), el('span', { text: 'ур. / ' + c })),
+          el('div', { class: 'level' }, levelInput(heroId, slot, it, c), el('span', { text: 'ур. / ' + c })),
           holdBtn('+', 'Увеличить уровень (удерживай для быстрой смены)', heroId, slot, 1),
           el('div', { class: 'chips' }, chips)));
     });

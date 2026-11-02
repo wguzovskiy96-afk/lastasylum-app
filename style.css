@@ -106,6 +106,14 @@ h2 { margin: 0; font-size: 16px; font-weight: 500; color: var(--text-strong); }
 .step-btn:active { background: var(--card-active); border-color: var(--gold-dim); }
 .level { min-width: 52px; text-align: center; display: flex; flex-direction: column; line-height: 1; }
 .level b { font-size: 20px; color: var(--text-strong); }
+.level-input {
+  width: 46px; padding: 0 0 1px; margin: 0 auto; text-align: center;
+  font: 700 20px/1.1 Rubik, system-ui, sans-serif; color: var(--text-strong);
+  background: transparent; border: none; border-bottom: 1px dashed var(--line-strong); border-radius: 0;
+  -webkit-appearance: none; appearance: none; caret-color: var(--gold);
+}
+.level-input::placeholder { color: var(--muted); opacity: 1; }
+.level-input:focus { outline: none; border-bottom: 1px solid var(--gold); color: var(--gold); }
 .level span { font-size: 10px; color: var(--muted); margin-top: 2px; }
 .chips { display: flex; gap: 4px; margin-left: auto; }
 .chip { min-width: 42px; height: 32px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); }
