@@ -9,8 +9,6 @@
     tg.expand();
     try { tg.setHeaderColor('#14171F'); tg.setBackgroundColor('#14171F'); } catch (e) { /* старые клиенты */ }
   }
-  // sendData работает, только если помощник открыт кнопкой клавиатуры под полем ввода
-  const canSend = inTelegram && !(tg.initDataUnsafe && tg.initDataUnsafe.query_id);
 
   const POS = ['dd1', 'dd2', 'sup', 't1', 't2'];
   const POS_INFO = {
@@ -466,25 +464,47 @@
         : el('div', { class: 'done', text: 'Все уровни на потолке. Дальше прокачку открывают звёзды.' }),
       el('div', { class: 'row' }, el('h2', { text: 'Звёзды' }), el('div', { class: 'muted', text: 'отдельный маршрут' })),
       stars.length ? el('div', { class: 'steps' }, stars) : el('div', { class: 'done', text: 'Звёздный маршрут пройден.' }),
-      el('div', { class: 'note', text: '5★ качается только за красные чертежи, поэтому бот не ставит её в маршрут.' }),
+      el('div', { class: 'note', text: '5★ качается только за красные чертежи, поэтому помощник не ставит её в маршрут.' }),
       el('div', { class: 'footer' },
         el('button', { type: 'button', class: 'btn ghost', text: 'Изменить', onclick: () => go('equip') }),
-        el('button', { type: 'button', class: 'btn primary', text: 'Отправить в чат', onclick: sendToChat })),
+        el('button', { type: 'button', class: 'btn primary', text: 'Поделиться', onclick: shareResult })),
     ];
   }
 
-  function sendToChat() {
-    if (!canSend) {
-      alertBox('Чтобы отправить разбор в чат, открой помощника кнопкой «Открыть помощника» под полем ввода сообщения.');
+  // ---------- Поделиться разбором (без бота) ----------
+  const APP_URL = location.origin + location.pathname;
+
+  function shareText() {
+    const r = state.result;
+    const lines = ['Last Asylum — что качать', '', r.summary.text];
+    if (r.levels.length) {
+      lines.push('', 'Уровни:');
+      r.levels.slice(0, 6).forEach((s, i) => lines.push(`${i + 1}. ${s.hero} · ${SLOT_NAMES[s.slot]}: ${s.from} → ${s.to}`));
+    }
+    if (r.stars.length) {
+      lines.push('', 'Звёзды:');
+      r.stars.slice(0, 4).forEach((s, i) => lines.push(`${i + 1}. ${s.hero} · ${SLOT_NAMES[s.slot]}: ${s.from}★ → ${s.to}★`));
+    }
+    const n = (p) => state.byId[state.squad[p]].name;
+    lines.push('', `Отряд: ДД ${n('dd1')}, ${n('dd2')} · саппорт ${n('sup')} · танки ${n('t1')}, ${n('t2')}`);
+    lines.push('Помощник: ' + APP_URL);
+    return lines.join('\n');
+  }
+
+  async function shareResult() {
+    const text = shareText();
+    try { tg && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
+    // В Telegram — стандартное окно «Переслать в…»; текст целиком в параметре url, чтобы не было лишней ссылки сверху
+    if (inTelegram && tg.openTelegramLink) {
+      tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(text));
       return;
     }
-    const eq = {};
-    for (const pos of POS) {
-      const id = state.squad[pos];
-      eq[id] = SLOTS.map((s) => { const it = item(id, s); return [it.level, it.stars]; });
+    // В обычном браузере — системное «Поделиться», иначе копируем текст
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
     }
-    try { tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
-    tg.sendData(JSON.stringify({ v: 1, squad: state.squad, eq }));
+    try { await navigator.clipboard.writeText(text); alertBox('Разбор скопирован — вставь его в нужный чат.'); }
+    catch (e) { window.open('https://t.me/share/url?url=' + encodeURIComponent(text), '_blank'); }
   }
 
   // ---------- Общее ----------
