@@ -94,6 +94,8 @@
         stars.push({ position, hero: hero(position).name, slot, from: it.stars, to: target, capFrom: cap(it.stars), capTo: cap(target) });
       }
     }
+    // Шаги, где звезда уже открыла уровни, — самые дешёвые: всегда наверх списка
+    levels.sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
     return { levels, stars, summary: summary(levels, stars) };
   }
 
