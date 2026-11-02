@@ -472,8 +472,6 @@
   }
 
   // ---------- Поделиться разбором (без бота) ----------
-  const APP_URL = location.origin + location.pathname;
-
   function shareText() {
     const r = state.result;
     const lines = ['Last Asylum — что качать', '', r.summary.text];
@@ -487,7 +485,6 @@
     }
     const n = (p) => state.byId[state.squad[p]].name;
     lines.push('', `Отряд: ДД ${n('dd1')}, ${n('dd2')} · саппорт ${n('sup')} · танки ${n('t1')}, ${n('t2')}`);
-    lines.push('Помощник: ' + APP_URL);
     return lines.join('\n');
   }
 
