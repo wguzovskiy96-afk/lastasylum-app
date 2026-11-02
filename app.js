@@ -190,6 +190,61 @@
     render();
   }
 
+  // ---------- Удержание −/+ : уровень бежит сам и ускоряется ----------
+  let hold = null;
+  function stopHold() {
+    if (!hold) return;
+    clearTimeout(hold.timer);
+    hold = null;
+  }
+
+  // Шаг на delta от текущего значения; возвращает новый уровень или null, если упёрлись в 0 / потолок
+  function stepLevel(heroId, slot, delta) {
+    const it = item(heroId, slot);
+    const next = Math.max(0, Math.min(cap(it.stars), it.level + delta));
+    if (next === it.level) return null;
+    setItem(heroId, slot, next, it.stars);
+    return next;
+  }
+
+  function startHold(heroId, slot, delta) {
+    stopHold();
+    if (stepLevel(heroId, slot, delta) === null) return;
+    haptic();
+    const started = Date.now();
+    const tick = () => {
+      if (!hold) return;
+      const lvl = stepLevel(heroId, slot, delta);
+      if (lvl === null) {
+        stopHold();
+        try { tg && tg.HapticFeedback.impactOccurred('medium'); } catch (e) { /* ignore */ }
+        return;
+      }
+      if (lvl % 5 === 0) haptic();
+      const t = Date.now() - started;
+      hold.timer = setTimeout(tick, t > 2000 ? 40 : t > 1000 ? 80 : 140);
+    };
+    hold = { timer: setTimeout(tick, 400) };
+  }
+
+  // Кнопка перерисовывается на каждом шаге, поэтому отпускание ловим на всём окне
+  ['pointerup', 'pointercancel', 'blur'].forEach((ev) => window.addEventListener(ev, stopHold));
+  document.addEventListener('visibilitychange', stopHold);
+
+  function holdBtn(text, label, heroId, slot, delta) {
+    return el('button', {
+      type: 'button', class: 'step-btn', text, 'aria-label': label,
+      onpointerdown: (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        startHold(heroId, slot, delta);
+      },
+      // Клик мышью/пальцем уже обработан в pointerdown; здесь — только Enter/Пробел с клавиатуры
+      onclick: (e) => { if (e.detail === 0) stepLevel(heroId, slot, delta); },
+      oncontextmenu: (e) => e.preventDefault(),
+    });
+  }
+
   function filledCount() { return POS.filter((p) => state.squad[p]).length; }
   function nextEmpty(from) {
     const start = POS.indexOf(from);
@@ -317,11 +372,9 @@
           el('div', { class: 'title' }, SLOT_NAMES[slot], headroom ? el('span', { class: 'badge', text: 'можно до ' + c }) : null),
           el('div', { class: 'stars', role: 'group', 'aria-label': `Звёзды: ${it.stars} из 5` }, stars)),
         el('div', { class: 'controls' },
-          el('button', { type: 'button', class: 'step-btn', text: '−', 'aria-label': 'Уменьшить уровень',
-            onclick: () => setItem(heroId, slot, it.level - 1, it.stars) }),
+          holdBtn('−', 'Уменьшить уровень (удерживай для быстрой смены)', heroId, slot, -1),
           el('div', { class: 'level' }, el('b', { text: it.level }), el('span', { text: 'ур. / ' + c })),
-          el('button', { type: 'button', class: 'step-btn', text: '+', 'aria-label': 'Увеличить уровень',
-            onclick: () => setItem(heroId, slot, it.level + 1, it.stars) }),
+          holdBtn('+', 'Увеличить уровень (удерживай для быстрой смены)', heroId, slot, 1),
           el('div', { class: 'chips' }, chips)));
     });
 
